@@ -39,11 +39,13 @@ class FixItem extends Command {
         $newDatabaseName = config('database.connections.mysql.database') . '_' . $this->argument('tenantId');
         config(['database.connections.mysql.database' => $newDatabaseName]);
 
+        $file = storage_path('repair_' . $this->argument('tenantId') . '.txt');
+
         $max = 100;
         $totalRows = \DB::select('SELECT count(id) as count FROM items items1 where item_category_id = 1 and exists (select 1 from items items2 where items2.code = items1.code limit 1,1)')[0]->count;
         $pages = ceil($totalRows / $max);
 
-        $choice = $this->choice('Repairing ' . (string) $totalRows . ' items. Continue?', ['YES', 'NO']);
+        $choice = $this->choice('Repairing ' . (string) $totalRows . ' items in ' . $pages . ' pages. Continue?', ['YES', 'NO']);
 
         if (($choice == 'NO')) {
             return;
@@ -65,7 +67,13 @@ class FixItem extends Command {
                     \DB::table('items')->where('id', $row->id)->delete();
                     $this->info('Item Deleted. ID: ' . $row->id);
                 } else {
-                    $this->warn('Item Not Deleted. ID: ' . $row->id . ' => ' . ($inventoryExists ? ' Inv exists ' : '') . ($cleared ? ' Cleared' : ''));
+
+                    $message = 'Item Not Deleted. ID: ' . $row->id . ' => ' . ($inventoryExists ? ' Inv exists ' : '') . ($cleared ? ' Cleared' : '');
+                    $this->warn($message);
+
+                    $fh = fopen($file, 'a');
+                    fwrite($fh, $message . "\n");
+                    fclose($fh);
                 }
             }
         }
